@@ -1,0 +1,43 @@
+version: 2.1
+orbs:
+  aws-cli: circleci/aws-cli@1.4.0
+jobs:
+  deploy-cfn:
+    parameters:
+      stack-name1:
+        description: My-Instance-Scheduler
+        type: string
+      stack-name2:
+        description: My-Custom-Instance-Schedule
+        type: string
+      aws-cross-account-roles:
+        description: Cross Account IAM roles that can be assume from the Org Account
+        type: string
+    executor: aws-cli/default
+    steps:
+      - checkout
+      - aws-cli/setup
+      - run:
+          name: Deploy Cloudformation Template of Instance Scheduler
+          command: |
+            aws cloudformation deploy \
+            --template aws-instance-scheduler.template \
+            --stack << parameters.stack-name1 >> \
+            --parameter-overrides Regions="us-east-1" StartedTags="startednow" CrossAccountRoles=<< parameters.aws-cross-account-roles >> StoppedTags="stopped" \
+            --capabilities CAPABILITY_NAMED_IAM   
+      - run:
+          name: Enable Custom Schedule
+          command: |
+            aws cloudformation deploy \
+            --template custom-schedule.template \
+            --stack << parameters.stack-name2 >> \
+            --parameter-overrides StackName=<< parameters.stack-name1 >> \
+            --capabilities CAPABILITY_NAMED_IAM       
+      
+workflows:
+  deploy:
+    jobs:
+    - deploy-cfn:
+        stack-name1: My-Instnace-Scheduler
+        stack-name2: My-Custom-Instance-Schedule
+        aws-cross-account-roles: "arn:aws:iam::000000000000:role/cross-account-role,arn:aws:iam::000000000000:role/service-role/cross-account-role2"
